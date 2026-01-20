@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16
+    container_name: coworkbooking-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: coworkbooking
+    ports:
+      - "5432:5432"
+    volumes:
+      - coworkbooking_data:/var/lib/postgresql/data
+
+volumes:
+  coworkbooking_data:
