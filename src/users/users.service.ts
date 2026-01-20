@@ -13,7 +13,7 @@ export class UsersService {
 
     if (existing) return { data: existing };
 
-    // ⚠️ MVP : tu remplaceras ça par de vraies infos Clerk plus tard
+    // TODO: Remplacer par des vraies données Clerk
     const created: User = await this.prisma.user.create({
       data: {
         clerkUserId,

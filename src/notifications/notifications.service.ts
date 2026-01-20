@@ -39,7 +39,6 @@ export class NotificationsService {
           errorMsg: String(err?.message || err),
         },
       });
-      // ❗ ne bloque jamais
     }
   }
 

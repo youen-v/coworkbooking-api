@@ -14,7 +14,6 @@ export class ClerkAuthGuard implements CanActivate {
 
     const authHeader = req.headers.authorization;
 
-    // Express peut donner string | string[] | undefined
     const auth =
       typeof authHeader === "string"
         ? authHeader

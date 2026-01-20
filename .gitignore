@@ -1,3 +1,7 @@
 node_modules/
-/generated/prisma
+dist/
+generated/prisma
 .env
+.DS_Store
+.vscode/
+coverage/

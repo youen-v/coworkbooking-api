@@ -33,14 +33,13 @@ export class ReservationsService {
     const user = await this.prisma.user.findUnique({ where: { clerkUserId } });
     if (!user) throw new BadRequestException("User not found");
 
-    // Vérifie resource
+    // Vérification des ressources
     const resource = await this.prisma.resource.findUnique({
       where: { id: dto.resourceId },
     });
     if (!resource || !resource.enabled)
       throw new NotFoundException("Resource not available");
 
-    // Conflit : overlap (start < existingEnd && end > existingStart)
     const conflict = await this.prisma.reservation.findFirst({
       where: {
         resourceId: dto.resourceId,
@@ -62,7 +61,7 @@ export class ReservationsService {
       include: { resource: true, user: true },
     });
 
-    // Email user + admin (doit pas bloquer)
+    // Email user + admin
     this.notifications.safeReservationCreated(reservation).catch(() => {});
 
     return reservation;
