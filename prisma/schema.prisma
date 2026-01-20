@@ -1,0 +1,82 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum ReservationStatus {
+  ACTIVE
+  MODIFIED
+  CANCELLED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  clerkUserId  String   @unique
+  email        String
+  fullName     String?
+  role         UserRole @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  reservations Reservation[]
+}
+
+model Resource {
+  id           String   @id @default(cuid())
+  name         String
+  description  String
+  enabled      Boolean  @default(true)
+  capacity     Int?
+  durationMin  Int      @default(60)  // minutes
+  durationMax  Int      @default(180) // minutes
+
+  // disponibilité simple JSON : { mon: ["09:00-18:00"], tue: ... }
+  availability Json
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  reservations Reservation[]
+}
+
+model Reservation {
+  id          String            @id @default(cuid())
+  userId      String
+  resourceId  String
+
+  startAt     DateTime
+  endAt       DateTime
+  status      ReservationStatus @default(ACTIVE)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id])
+  resource    Resource @relation(fields: [resourceId], references: [id])
+
+  @@index([resourceId, startAt, endAt])
+}
+
+model EmailLog {
+  id        String   @id @default(cuid())
+  to        String
+  subject   String
+  status    String   // SENT | FAILED
+  errorMsg  String?
+  createdAt DateTime @default(now())
+}
