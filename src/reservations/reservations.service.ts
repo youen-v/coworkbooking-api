@@ -23,6 +23,26 @@ export class ReservationsService {
     return d;
   }
 
+  private async ensureUser(clerkUserId: string) {
+    let user = await this.prisma.user.findUnique({
+      where: { clerkUserId },
+    });
+
+    if (user) return user;
+
+    // Création automatique du user si pas existant
+    user = await this.prisma.user.create({
+      data: {
+        clerkUserId,
+        email: `user-${clerkUserId}@example.com`,
+        fullName: null,
+        role: "USER",
+      },
+    });
+
+    return user;
+  }
+
   async create(clerkUserId: string, dto: CreateReservationDto) {
     const startAt = this.parseDate(dto.startAt);
     const endAt = this.parseDate(dto.endAt);
@@ -30,8 +50,7 @@ export class ReservationsService {
     if (endAt <= startAt)
       throw new BadRequestException("endAt must be after startAt");
 
-    const user = await this.prisma.user.findUnique({ where: { clerkUserId } });
-    if (!user) throw new BadRequestException("User not found");
+    const user = await this.ensureUser(clerkUserId);
 
     // Vérification des ressources
     const resource = await this.prisma.resource.findUnique({
@@ -77,8 +96,7 @@ export class ReservationsService {
     const startAt = this.parseDate(dto.startAt);
     const endAt = this.parseDate(dto.endAt);
 
-    const user = await this.prisma.user.findUnique({ where: { clerkUserId } });
-    if (!user) throw new BadRequestException("User not found");
+    const user = await this.ensureUser(clerkUserId);
 
     const existing = await this.prisma.reservation.findUnique({
       where: { id },
@@ -117,8 +135,7 @@ export class ReservationsService {
   }
 
   async cancel(clerkUserId: string, id: string) {
-    const user = await this.prisma.user.findUnique({ where: { clerkUserId } });
-    if (!user) throw new BadRequestException("User not found");
+    const user = await this.ensureUser(clerkUserId);
 
     const existing = await this.prisma.reservation.findUnique({
       where: { id },
@@ -140,8 +157,7 @@ export class ReservationsService {
   }
 
   async myReservations(clerkUserId: string) {
-    const user = await this.prisma.user.findUnique({ where: { clerkUserId } });
-    if (!user) throw new BadRequestException("User not found");
+    const user = await this.ensureUser(clerkUserId);
 
     const data = await this.prisma.reservation.findMany({
       where: { userId: user.id },
