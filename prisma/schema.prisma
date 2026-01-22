@@ -20,6 +20,7 @@ enum UserRole {
 }
 
 enum ReservationStatus {
+  PENDING_PAYMENT
   ACTIVE
   MODIFIED
   CANCELLED
@@ -70,6 +71,8 @@ model Reservation {
   user        User     @relation(fields: [userId], references: [id])
   resource    Resource @relation(fields: [resourceId], references: [id])
 
+  payment     Payment?
+
   @@index([resourceId, startAt, endAt])
 }
 
@@ -80,4 +83,23 @@ model EmailLog {
   status    String   // SENT | FAILED
   errorMsg  String?
   createdAt DateTime @default(now())
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  reservationId   String        @unique
+  stripeSessionId String        @unique
+  amountCents     Int
+  currency        String        @default("eur")
+  status          PaymentStatus @default(PENDING)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  reservation     Reservation   @relation(fields: [reservationId], references: [id])
 }

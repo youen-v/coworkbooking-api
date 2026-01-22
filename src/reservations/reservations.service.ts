@@ -43,7 +43,13 @@ export class ReservationsService {
     const conflict = await this.prisma.reservation.findFirst({
       where: {
         resourceId: dto.resourceId,
-        status: { in: [ReservationStatus.ACTIVE, ReservationStatus.MODIFIED] },
+        status: {
+          in: [
+            ReservationStatus.PENDING_PAYMENT,
+            ReservationStatus.ACTIVE,
+            ReservationStatus.MODIFIED,
+          ],
+        },
         AND: [{ startAt: { lt: endAt } }, { endAt: { gt: startAt } }],
       },
     });
