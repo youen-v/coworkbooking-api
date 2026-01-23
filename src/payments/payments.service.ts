@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import Stripe from "stripe";
 import { PrismaService } from "../prisma/prisma.service";
+import { ReservationStatus } from "@prisma/client";
 
 @Injectable()
 export class PaymentsService {
@@ -25,23 +26,24 @@ export class PaymentsService {
     if (reservation.userId !== user.id)
       throw new BadRequestException("Not your reservation");
 
-    // Si paiement en pending
-    if (reservation.status !== "PENDING_PAYMENT") {
+    if (reservation.status !== ReservationStatus.PENDING_PAYMENT) {
       throw new BadRequestException("Reservation not in payment state");
     }
 
-    // DEMO
-    const amountCents = 1500; // 15€
-    const currency = "eur";
+    // Prix démo 15€
+    const amountCents = 1500;
 
     const session = await this.stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
+      success_url: `${process.env.STRIPE_SUCCESS_URL}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.STRIPE_CANCEL_URL}?session_id={CHECKOUT_SESSION_ID}`,
+
       line_items: [
         {
           quantity: 1,
           price_data: {
-            currency,
+            currency: "eur",
             unit_amount: amountCents,
             product_data: {
               name: `Réservation - ${reservation.resource.name}`,
@@ -50,21 +52,18 @@ export class PaymentsService {
           },
         },
       ],
-      success_url: `${process.env.STRIPE_SUCCESS_URL}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.STRIPE_CANCEL_URL}?reservationId=${reservationId}`,
+
+      // Clé de la réservation dans le webhook
       metadata: {
-        reservationId,
-        clerkUserId,
+        reservationId: reservation.id,
       },
     });
 
-    await this.prisma.payment.create({
+    // Stockage de la session Stripe
+    await this.prisma.reservation.update({
+      where: { id: reservation.id },
       data: {
-        reservationId,
         stripeSessionId: session.id,
-        amountCents,
-        currency,
-        status: "PENDING",
       },
     });
 

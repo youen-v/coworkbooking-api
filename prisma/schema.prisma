@@ -63,7 +63,11 @@ model Reservation {
 
   startAt     DateTime
   endAt       DateTime
-  status      ReservationStatus @default(ACTIVE)
+  status      ReservationStatus @default(PENDING_PAYMENT)
+
+  // Stripe
+  stripeSessionId   String?  @unique
+  paidAt            DateTime?
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

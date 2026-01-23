@@ -5,15 +5,17 @@ import { PaymentsService } from "./payments.service";
 @Controller("/api/v1/payments")
 @UseGuards(ClerkAuthGuard)
 export class PaymentsController {
-  constructor(private service: PaymentsService) {}
+  constructor(private payments: PaymentsService) {}
 
   @Post("/checkout-session")
-  async checkout(@Req() req: any, @Body() body: { reservationId: string }) {
-    return {
-      data: await this.service.createCheckoutSession(
-        req.clerkUserId,
-        body.reservationId,
-      ),
-    };
+  async createCheckout(
+    @Req() req: any,
+    @Body() body: { reservationId: string },
+  ) {
+    const data = await this.payments.createCheckoutSession(
+      req.clerkUserId,
+      body.reservationId,
+    );
+    return { data };
   }
 }

@@ -81,7 +81,7 @@ export class ReservationsService {
         resourceId: dto.resourceId,
         startAt,
         endAt,
-        status: ReservationStatus.ACTIVE,
+        status: ReservationStatus.PENDING_PAYMENT,
       },
       include: { resource: true, user: true },
     });
