@@ -8,6 +8,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateReservationDto } from "./dto/create-reservation.dto";
 import { ReservationStatus } from "@prisma/client";
 import { NotificationsService } from "../notifications/notifications.service";
+import { UpdateReservationDto } from "./dto/update-reservation.dto";
 
 @Injectable()
 export class ReservationsService {
@@ -86,16 +87,10 @@ export class ReservationsService {
       include: { resource: true, user: true },
     });
 
-    // Email user + admin
-    this.notifications.safeReservationCreated(reservation).catch(() => {});
-
     return reservation;
   }
 
-  async update(clerkUserId: string, id: string, dto: CreateReservationDto) {
-    const startAt = this.parseDate(dto.startAt);
-    const endAt = this.parseDate(dto.endAt);
-
+  async update(clerkUserId: string, id: string, dto: UpdateReservationDto) {
     const user = await this.ensureUser(clerkUserId);
 
     const existing = await this.prisma.reservation.findUnique({
@@ -109,27 +104,74 @@ export class ReservationsService {
     if (existing.status === ReservationStatus.CANCELLED)
       throw new BadRequestException("Reservation cancelled");
 
+    // MAJ nouvelles valeurs
+    const newResourceId =
+      dto.resourceId && dto.resourceId.trim().length > 0
+        ? dto.resourceId.trim()
+        : existing.resourceId;
+
+    const newStartAt = dto.startAt
+      ? this.parseDate(dto.startAt)
+      : existing.startAt;
+    const newEndAt = dto.endAt ? this.parseDate(dto.endAt) : existing.endAt;
+
+    if (newEndAt <= newStartAt) {
+      throw new BadRequestException("endAt must be after startAt");
+    }
+
+    // Vérification de la disponibilité de la ressource
+    const resource = await this.prisma.resource.findUnique({
+      where: { id: newResourceId },
+    });
+
+    if (!resource || !resource.enabled) {
+      throw new NotFoundException("Resource not available");
+    }
+
+    // Gestion des conflits avec le statut du paiement sur la ressource cible
     const conflict = await this.prisma.reservation.findFirst({
       where: {
         id: { not: id },
-        resourceId: existing.resourceId,
-        status: { in: [ReservationStatus.ACTIVE, ReservationStatus.MODIFIED] },
-        AND: [{ startAt: { lt: endAt } }, { endAt: { gt: startAt } }],
+        resourceId: newResourceId,
+        status: {
+          in: [
+            ReservationStatus.PENDING_PAYMENT,
+            ReservationStatus.ACTIVE,
+            ReservationStatus.MODIFIED,
+          ],
+        },
+        AND: [{ startAt: { lt: newEndAt } }, { endAt: { gt: newStartAt } }],
       },
     });
 
     if (conflict) throw new ConflictException("Slot already booked");
 
+    // Si réservation était PENDING_PAYMENT : on garde PENDING_PAYMENT
+    // Si ACTIVE/MODIFIED : on passe en MODIFIED
+    const nextStatus =
+      existing.status === ReservationStatus.PENDING_PAYMENT
+        ? ReservationStatus.PENDING_PAYMENT
+        : ReservationStatus.MODIFIED;
+
+    // Si le user modifie la ressource mais quelle n’est pas encore payé reset stripeSessionId
+    const shouldResetStripeSession =
+      existing.status === ReservationStatus.PENDING_PAYMENT;
+
     const updated = await this.prisma.reservation.update({
       where: { id },
       data: {
-        startAt,
-        endAt,
-        status: ReservationStatus.MODIFIED,
+        resourceId: newResourceId,
+        startAt: newStartAt,
+        endAt: newEndAt,
+        status: nextStatus,
+        stripeSessionId: shouldResetStripeSession
+          ? null
+          : existing.stripeSessionId,
       },
       include: { resource: true, user: true },
     });
 
+    // Email confirmation modification
     this.notifications.safeReservationUpdated(updated).catch(() => {});
     return updated;
   }
@@ -146,12 +188,21 @@ export class ReservationsService {
     if (existing.userId !== user.id)
       throw new BadRequestException("Not your reservation");
 
+    if (existing.status === ReservationStatus.CANCELLED) {
+      return existing;
+    }
+
     const cancelled = await this.prisma.reservation.update({
+      // annulation session paiement avec reset stripeSessionId
       where: { id },
-      data: { status: ReservationStatus.CANCELLED },
+      data: {
+        status: ReservationStatus.CANCELLED,
+        stripeSessionId: null,
+      },
       include: { resource: true, user: true },
     });
 
+    // Email d'annulation
     this.notifications.safeReservationCancelled(cancelled).catch(() => {});
     return cancelled;
   }
@@ -166,5 +217,21 @@ export class ReservationsService {
     });
 
     return data;
+  }
+
+  async getOne(clerkUserId: string, id: string) {
+    const user = await this.prisma.user.findUnique({ where: { clerkUserId } });
+    if (!user) throw new BadRequestException("User not found");
+
+    const reservation = await this.prisma.reservation.findUnique({
+      where: { id },
+      include: { resource: true, user: true },
+    });
+
+    if (!reservation) throw new NotFoundException("Reservation not found");
+    if (reservation.userId !== user.id)
+      throw new BadRequestException("Not your reservation");
+
+    return reservation;
   }
 }

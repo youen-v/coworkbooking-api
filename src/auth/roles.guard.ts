@@ -44,7 +44,7 @@ export class RolesGuard implements CanActivate {
     if (!user) throw new ForbiddenException("User not found in DB");
 
     if (!roles.includes(user.role)) {
-      throw new ForbiddenException("Insufficient permissions");
+      throw new ForbiddenException("401 - Insufficient permissions");
     }
 
     return true;

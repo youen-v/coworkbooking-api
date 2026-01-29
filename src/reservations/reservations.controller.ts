@@ -12,11 +12,22 @@ import {
 import { ClerkAuthGuard } from "../auth/clerk-auth.guard";
 import { ReservationsService } from "./reservations.service";
 import { CreateReservationDto } from "./dto/create-reservation.dto";
+import { UpdateReservationDto } from "./dto/update-reservation.dto";
 
 @Controller("/api/v1/reservations")
 @UseGuards(ClerkAuthGuard)
 export class ReservationsController {
   constructor(private service: ReservationsService) {}
+
+  @Get("me")
+  async mine(@Req() req: any) {
+    return { data: await this.service.myReservations(req.clerkUserId) };
+  }
+
+  @Get(":id")
+  async getOne(@Req() req: any, @Param("id") id: string) {
+    return { data: await this.service.getOne(req.clerkUserId, id) };
+  }
 
   @Post()
   async create(@Req() req: any, @Body() dto: CreateReservationDto) {
@@ -27,7 +38,7 @@ export class ReservationsController {
   async update(
     @Req() req: any,
     @Param("id") id: string,
-    @Body() dto: CreateReservationDto,
+    @Body() dto: UpdateReservationDto,
   ) {
     return { data: await this.service.update(req.clerkUserId, id, dto) };
   }
@@ -35,10 +46,5 @@ export class ReservationsController {
   @Delete(":id")
   async cancel(@Req() req: any, @Param("id") id: string) {
     return { data: await this.service.cancel(req.clerkUserId, id) };
-  }
-
-  @Get("me")
-  async mine(@Req() req: any) {
-    return { data: await this.service.myReservations(req.clerkUserId) };
   }
 }

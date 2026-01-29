@@ -2,12 +2,16 @@ import { Controller, Post, Req, Res } from "@nestjs/common";
 import Stripe from "stripe";
 import { PrismaService } from "../prisma/prisma.service";
 import { ReservationStatus } from "@prisma/client";
+import { NotificationsService } from "src/notifications/notifications.service";
 
 @Controller("/api/v1/webhooks")
 export class StripeWebhookController {
   private stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   @Post("/stripe")
   async handleStripe(@Req() req: any, @Res() res: any) {
@@ -28,16 +32,19 @@ export class StripeWebhookController {
       const session = event.data.object as Stripe.Checkout.Session;
 
       const reservationId = session.metadata?.reservationId;
-      const paid = session.payment_status === "paid"; // sécurité
+      const paid = session.payment_status === "paid";
 
       if (reservationId && paid) {
-        await this.prisma.reservation.update({
+        const updated = await this.prisma.reservation.update({
           where: { id: reservationId },
           data: {
             status: ReservationStatus.ACTIVE,
             paidAt: new Date(),
           },
+          include: { user: true, resource: true },
         });
+
+        this.notifications.safeReservationCreated(updated).catch(() => {});
       }
     }
 
@@ -47,12 +54,13 @@ export class StripeWebhookController {
       const reservationId = session.metadata?.reservationId;
 
       if (reservationId) {
-        await this.prisma.reservation.update({
+        const cancelled = await this.prisma.reservation.update({
           where: { id: reservationId },
-          data: {
-            status: ReservationStatus.CANCELLED,
-          },
+          data: { status: ReservationStatus.CANCELLED },
+          include: { user: true, resource: true },
         });
+
+        this.notifications.safeReservationCancelled(cancelled).catch(() => {});
       }
     }
 

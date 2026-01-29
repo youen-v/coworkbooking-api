@@ -19,7 +19,7 @@ async function main() {
     update: {},
     create: {
       clerkUserId: "clerk_demo_admin",
-      email: "admin@demo.com",
+      email: "admin+clerk_test@demo.com",
       fullName: "Admin Demo",
       role: UserRole.ADMIN,
     },
@@ -30,7 +30,7 @@ async function main() {
     update: {},
     create: {
       clerkUserId: "clerk_demo_user",
-      email: "user@demo.com",
+      email: "user+clerk_test@demo.com",
       fullName: "User Demo",
       role: UserRole.USER,
     },
